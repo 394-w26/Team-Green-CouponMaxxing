@@ -1,7 +1,21 @@
-# React + TypeScript + Vite + Vitest
+# 💰 CouponMaxxing
 
-A starter template for building React 19+ apps in TypeScript with Vite and TailwindCSS 4. Includes Vitest for unit testing and
-a hefty .gitignore file. React compiler enabled.
+**Live Demo:** [https://394-w26.github.io/Team-Green-CouponMaxxing/](https://394-w26.github.io/Team-Green-CouponMaxxing/)
+
+A coupon tracking app that helps users organize coupons by expiration date and never miss a deal. Built with React 19, TypeScript, Vite, and TailwindCSS 4.
+
+## Features
+- Track coupons with intuitive emoji icons
+- Filter by expiration, category, or store
+- Color-coded urgency indicators
+- Mark coupons as used or move to trash
+- Mobile-friendly design
+
+---
+
+## Development Setup
+
+Built from the react-copilot starter template.
 
 # Requirements
 
