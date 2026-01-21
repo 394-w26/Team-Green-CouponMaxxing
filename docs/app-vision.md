@@ -3,7 +3,7 @@ CouponMaxxing
 
 # Users
 College students and young adults who clip coupons but struggle to keep track of when they expire and which ones are worth using.
-
+d
 # Value Proposition
 Stop letting good coupons go to waste. CouponMaxxing is a simple coupon-tracking app that organizes coupons by expiration date, highlights which coupons should be used next, and helps users make quick savings decisions.
 
