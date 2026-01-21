@@ -123,6 +123,52 @@ export const formatExpirationDate = (date: string, daysUntil: number): string =>
 export const getExpiringSoonCount = (coupons: Coupon[]): number => {
   return coupons.filter(coupon => {
     const days = getDaysUntilExpiration(coupon.expirationDate);
-    return coupon.status === 'active' && days >= 0 && days <= 3;
+    return coupon.status === 'active' && days >= 0 && days <= 2;
   }).length;
+};
+
+export const getStoreIcon = (storeName: string, category?: string): string => {
+  const lowerStore = storeName.toLowerCase();
+  
+  // Store-specific icons
+  if (lowerStore.includes('pizza')) return '🍕';
+  if (lowerStore.includes('subway')) return '🥪';
+  if (lowerStore.includes('starbucks') || lowerStore.includes('coffee')) return '☕';
+  if (lowerStore.includes('chipotle') || lowerStore.includes('taco') || lowerStore.includes('burrito')) return '🌯';
+  if (lowerStore.includes('burger') || lowerStore.includes('mcdonald')) return '🍔';
+  if (lowerStore.includes('donut') || lowerStore.includes('dunkin')) return '🍩';
+  if (lowerStore.includes('ice cream') || lowerStore.includes('baskin')) return '🍦';
+  if (lowerStore.includes('sushi')) return '🍣';
+  if (lowerStore.includes('chicken') || lowerStore.includes('kfc') || lowerStore.includes('popeyes')) return '🍗';
+  
+  if (lowerStore.includes('target')) return '🎯';
+  if (lowerStore.includes('walmart') || lowerStore.includes('costco') || lowerStore.includes('sam')) return '🛒';
+  if (lowerStore.includes('amazon') || lowerStore.includes('ebay')) return '📦';
+  if (lowerStore.includes('best buy') || lowerStore.includes('electronics')) return '💻';
+  if (lowerStore.includes('home depot') || lowerStore.includes('lowe')) return '🔨';
+  
+  if (lowerStore.includes('cvs') || lowerStore.includes('walgreens') || lowerStore.includes('pharmacy') || lowerStore.includes('rite aid')) return '💊';
+  
+  if (lowerStore.includes('amc') || lowerStore.includes('cinema') || lowerStore.includes('movie') || lowerStore.includes('theatre')) return '🎬';
+  if (lowerStore.includes('gym') || lowerStore.includes('fitness')) return '💪';
+  if (lowerStore.includes('spa') || lowerStore.includes('salon')) return '💆';
+  
+  if (lowerStore.includes('bath') || lowerStore.includes('body')) return '🧴';
+  if (lowerStore.includes('nike') || lowerStore.includes('adidas') || lowerStore.includes('shoe')) return '👟';
+  if (lowerStore.includes('book') || lowerStore.includes('barnes')) return '📚';
+  if (lowerStore.includes('gas') || lowerStore.includes('shell') || lowerStore.includes('exxon')) return '⛽';
+  if (lowerStore.includes('hotel') || lowerStore.includes('airbnb')) return '🏨';
+  if (lowerStore.includes('uber') || lowerStore.includes('lyft')) return '🚗';
+  
+  // Category-based fallbacks
+  if (category) {
+    const lowerCategory = category.toLowerCase();
+    if (lowerCategory === 'food') return '🍽️';
+    if (lowerCategory === 'retail') return '🛍️';
+    if (lowerCategory === 'pharmacy') return '💊';
+    if (lowerCategory === 'entertainment') return '🎭';
+  }
+  
+  // Default icon
+  return '🎟️';
 };

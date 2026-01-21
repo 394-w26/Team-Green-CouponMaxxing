@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Coupon, FilterType } from './types';
-import { getDaysUntilExpiration, getExpiringSoonCount } from './couponUtils';
+import { getDaysUntilExpiration, getExpiringSoonCount, getStoreIcon } from './couponUtils';
 import CouponList from './CouponList';
 import CouponDetailModal from './CouponDetailModal';
 import AddCouponForm from './AddCouponForm';
@@ -97,7 +97,22 @@ function App() {
   }, [couponsById, couponStates, savedCoupons]);
 
   const activeCoupons = useMemo(() => 
-    coupons.filter(c => c.status === 'active'), 
+    coupons.filter(c => {
+      // Only show coupons that are active AND not expired
+      if (c.status !== 'active') return false;
+      const daysUntil = getDaysUntilExpiration(c.expirationDate);
+      return daysUntil >= 0; // Exclude expired coupons (negative days)
+    }), 
+    [coupons]
+  );
+
+  const expiredCoupons = useMemo(() =>
+    coupons.filter(c => {
+      // Coupons that are marked active but have expired
+      if (c.status !== 'active') return false;
+      const daysUntil = getDaysUntilExpiration(c.expirationDate);
+      return daysUntil < 0;
+    }),
     [coupons]
   );
 
@@ -138,13 +153,21 @@ function App() {
       });
     }
 
+    if (activeFilter === 'expired') {
+      return [...expiredCoupons].sort((a, b) => {
+        const dateA = new Date(a.expirationDate).getTime();
+        const dateB = new Date(b.expirationDate).getTime();
+        return dateB - dateA; // Most recently expired first
+      });
+    }
+
     let filtered = activeCoupons;
 
     switch (activeFilter) {
       case 'expiring-soon':
         filtered = filtered.filter(coupon => {
           const days = getDaysUntilExpiration(coupon.expirationDate);
-          return days >= 0 && days <= 3;
+          return days >= 0 && days <= 2;
         });
         break;
       case 'by-category':
@@ -164,7 +187,7 @@ function App() {
       const dateB = new Date(b.expirationDate).getTime();
       return dateA - dateB;
     });
-  }, [activeCoupons, activeFilter, selectedCategory, usedCoupons, deletedCoupons]);
+  }, [activeCoupons, activeFilter, selectedCategory, usedCoupons, deletedCoupons, expiredCoupons]);
 
   const setCouponStatus = async (couponId: string, status: Coupon['status']) => {
     if (!user) return;
@@ -208,18 +231,19 @@ function App() {
     }
   };
 
-  const handleAddCoupon = (newCoupon: Omit<Coupon, 'id' | 'status'>) => {
+  const handleAddCoupon = async (newCoupon: Omit<Coupon, 'id' | 'status'>) => {
     if (!user) return;
     const couponsRef = ref(db, 'coupons');
     const newRef = push(couponsRef);
     const couponData: CouponData = {
       ...newCoupon,
+      icon: newCoupon.icon || getStoreIcon(newCoupon.store, newCoupon.category),
       createdAt: Date.now(),
     };
-    void set(newRef, couponData);
+    await set(newRef, couponData);
     if (newRef.key) {
-      void set(ref(db, `users/${user.uid}/savedCoupons/${newRef.key}`), true);
-      void set(ref(db, `users/${user.uid}/couponStates/${newRef.key}`), {
+      await set(ref(db, `users/${user.uid}/savedCoupons/${newRef.key}`), true);
+      await set(ref(db, `users/${user.uid}/couponStates/${newRef.key}`), {
         status: 'active',
         updatedAt: Date.now(),
       });
@@ -323,6 +347,16 @@ function App() {
               }`}
             >
               ✓ Used ({usedCoupons.length})
+            </button>
+            <button
+              onClick={() => setActiveFilter('expired')}
+              className={`px-6 py-3 font-semibold whitespace-nowrap ${
+                activeFilter === 'expired'
+                  ? 'border-b-2 border-blue-600 text-blue-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              ⏰ Expired ({expiredCoupons.length})
             </button>
             <button
               onClick={() => setActiveFilter('trash')}
