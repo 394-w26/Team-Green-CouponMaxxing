@@ -1,16 +1,100 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Coupon, FilterType } from './types';
-import { initialCoupons, getDaysUntilExpiration, getExpiringSoonCount } from './couponUtils';
+import { getDaysUntilExpiration, getExpiringSoonCount } from './couponUtils';
 import CouponList from './CouponList';
 import CouponDetailModal from './CouponDetailModal';
 import AddCouponForm from './AddCouponForm';
+import { onValue, push, ref, remove, set } from 'firebase/database';
+import { db } from './firebase';
+import { useAuthUser } from './useAuthUser';
+
+type CouponState = {
+  status: Coupon['status'];
+  updatedAt: number;
+};
+
+type CouponData = Omit<Coupon, 'id' | 'status'> & {
+  createdAt?: number;
+};
 
 function App() {
-  const [coupons, setCoupons] = useState<Coupon[]>(initialCoupons);
+  const { user, loading } = useAuthUser();
+  const [couponsById, setCouponsById] = useState<Record<string, CouponData>>({});
+  const [couponStates, setCouponStates] = useState<Record<string, CouponState>>({});
+  const [savedCoupons, setSavedCoupons] = useState<Record<string, boolean> | null>(null);
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const seededSavedCoupons = useRef(false);
+
+  useEffect(() => {
+    const couponsRef = ref(db, 'coupons');
+    return onValue(couponsRef, (snapshot) => {
+      setCouponsById(snapshot.val() ?? {});
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setCouponStates({});
+      setSavedCoupons(null);
+      seededSavedCoupons.current = false;
+      return;
+    }
+
+    const savedRef = ref(db, `users/${user.uid}/savedCoupons`);
+    const statesRef = ref(db, `users/${user.uid}/couponStates`);
+
+    const unsubSaved = onValue(savedRef, (snapshot) => {
+      const data = snapshot.val();
+      setSavedCoupons(data ?? null);
+    });
+
+    const unsubStates = onValue(statesRef, (snapshot) => {
+      setCouponStates(snapshot.val() ?? {});
+    });
+
+    return () => {
+      unsubSaved();
+      unsubStates();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || savedCoupons !== null || seededSavedCoupons.current) {
+      return;
+    }
+
+    const couponIds = Object.keys(couponsById);
+    if (couponIds.length === 0) {
+      return;
+    }
+
+    const seed: Record<string, boolean> = {};
+    couponIds.forEach((id) => {
+      seed[id] = true;
+    });
+    seededSavedCoupons.current = true;
+    void set(ref(db, `users/${user.uid}/savedCoupons`), seed);
+  }, [user, couponsById, savedCoupons]);
+
+  const coupons = useMemo(() => {
+    const allCoupons = Object.entries(couponsById).map(([id, data]) => {
+      const state = couponStates[id];
+      return {
+        id,
+        status: state?.status ?? 'active',
+        ...data,
+      } as Coupon;
+    });
+
+    if (savedCoupons) {
+      return allCoupons.filter((coupon) => savedCoupons[coupon.id]);
+    }
+
+    return allCoupons;
+  }, [couponsById, couponStates, savedCoupons]);
 
   const activeCoupons = useMemo(() => 
     coupons.filter(c => c.status === 'active'), 
@@ -82,44 +166,75 @@ function App() {
     });
   }, [activeCoupons, activeFilter, selectedCategory, usedCoupons, deletedCoupons]);
 
+  const setCouponStatus = async (couponId: string, status: Coupon['status']) => {
+    if (!user) return;
+    const stateRef = ref(db, `users/${user.uid}/couponStates/${couponId}`);
+    const savedRef = ref(db, `users/${user.uid}/savedCoupons/${couponId}`);
+    await set(savedRef, true);
+    await set(stateRef, { status, updatedAt: Date.now() });
+  };
+
   const handleMarkAsUsed = (couponId: string) => {
-    setCoupons(prev => 
-      prev.map(c => c.id === couponId ? { ...c, status: 'used' as const } : c)
-    );
+    void setCouponStatus(couponId, 'used');
   };
 
   const handleDelete = (couponId: string) => {
-    setCoupons(prev => 
-      prev.map(c => c.id === couponId ? { ...c, status: 'deleted' as const } : c)
-    );
+    void setCouponStatus(couponId, 'deleted');
   };
 
   const handleRestore = (couponId: string) => {
-    setCoupons(prev => 
-      prev.map(c => c.id === couponId ? { ...c, status: 'active' as const } : c)
-    );
+    void setCouponStatus(couponId, 'active');
   };
 
   const handleClearTrash = () => {
     if (window.confirm('Are you sure you want to permanently delete all items in trash?')) {
-      setCoupons(prev => prev.filter(c => c.status !== 'deleted'));
+      if (!user) return;
+      deletedCoupons.forEach((coupon) => {
+        const stateRef = ref(db, `users/${user.uid}/couponStates/${coupon.id}`);
+        const savedRef = ref(db, `users/${user.uid}/savedCoupons/${coupon.id}`);
+        void remove(stateRef);
+        void remove(savedRef);
+      });
     }
   };
 
   const handlePermanentDelete = (couponId: string) => {
     if (window.confirm('Are you sure you want to permanently delete this coupon?')) {
-      setCoupons(prev => prev.filter(c => c.id !== couponId));
+      if (!user) return;
+      const stateRef = ref(db, `users/${user.uid}/couponStates/${couponId}`);
+      const savedRef = ref(db, `users/${user.uid}/savedCoupons/${couponId}`);
+      void remove(stateRef);
+      void remove(savedRef);
     }
   };
 
   const handleAddCoupon = (newCoupon: Omit<Coupon, 'id' | 'status'>) => {
-    const coupon: Coupon = {
+    if (!user) return;
+    const couponsRef = ref(db, 'coupons');
+    const newRef = push(couponsRef);
+    const couponData: CouponData = {
       ...newCoupon,
-      id: Date.now().toString(),
-      status: 'active',
+      createdAt: Date.now(),
     };
-    setCoupons(prev => [...prev, coupon]);
+    void set(newRef, couponData);
+    if (newRef.key) {
+      void set(ref(db, `users/${user.uid}/savedCoupons/${newRef.key}`), true);
+      void set(ref(db, `users/${user.uid}/couponStates/${newRef.key}`), {
+        status: 'active',
+        updatedAt: Date.now(),
+      });
+    }
   };
+
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-600 font-semibold">Connecting to your coupon vault...</p>
+      </div>
+    );
+  }
+
+  console.log('UID:', user.uid);
 
   return (
     <div className="min-h-screen bg-gray-50">
