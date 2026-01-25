@@ -26,6 +26,7 @@ function App() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedStore, setSelectedStore] = useState<string>('all');
   const seededSavedCoupons = useRef(false);
 
   useEffect(() => {
@@ -136,6 +137,30 @@ function App() {
     return Array.from(cats).sort();
   }, [activeCoupons]);
 
+  const stores = useMemo(() => {
+    // Normalize store names and group similar ones
+    const storeMap = new Map<string, string>();
+    
+    activeCoupons.forEach(coupon => {
+      if (!coupon.store) return;
+      const normalized = coupon.store.trim().toLowerCase();
+      
+      // If we haven't seen this normalized version, or if the current one is better capitalized
+      if (!storeMap.has(normalized)) {
+        storeMap.set(normalized, coupon.store.trim());
+      } else {
+        const existing = storeMap.get(normalized)!;
+        // Prefer properly capitalized versions (first letter uppercase)
+        if (coupon.store[0] === coupon.store[0].toUpperCase() && 
+            existing[0] === existing[0].toLowerCase()) {
+          storeMap.set(normalized, coupon.store.trim());
+        }
+      }
+    });
+    
+    return Array.from(storeMap.values()).sort();
+  }, [activeCoupons]);
+
   const filteredCoupons = useMemo(() => {
     if (activeFilter === 'used') {
       return [...usedCoupons].sort((a, b) => {
@@ -176,9 +201,14 @@ function App() {
         }
         break;
       case 'by-store':
-        // Sort alphabetically by store
-        filtered = [...filtered].sort((a, b) => a.store.localeCompare(b.store));
-        return filtered;
+        if (selectedStore !== 'all') {
+          // Normalize both store names for comparison to match similar variations
+          const normalizedSelected = selectedStore.trim().toLowerCase();
+          filtered = filtered.filter(coupon => 
+            coupon.store.trim().toLowerCase() === normalizedSelected
+          );
+        }
+        break;
     }
 
     // Default sort by expiration date
@@ -187,7 +217,7 @@ function App() {
       const dateB = new Date(b.expirationDate).getTime();
       return dateA - dateB;
     });
-  }, [activeCoupons, activeFilter, selectedCategory, usedCoupons, deletedCoupons, expiredCoupons]);
+  }, [activeCoupons, activeFilter, selectedCategory, selectedStore, usedCoupons, deletedCoupons, expiredCoupons]);
 
   const setCouponStatus = async (couponId: string, status: Coupon['status']) => {
     if (!user) return;
@@ -329,7 +359,10 @@ function App() {
               By Category
             </button>
             <button
-              onClick={() => setActiveFilter('by-store')}
+              onClick={() => {
+                setActiveFilter('by-store');
+                setSelectedStore('all');
+              }}
               className={`px-6 py-3 font-semibold whitespace-nowrap ${
                 activeFilter === 'by-store'
                   ? 'border-b-2 border-blue-600 text-blue-600'
@@ -388,6 +421,28 @@ function App() {
               <option value="all">All Categories</option>
               {categories.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Store Selector */}
+      {activeFilter === 'by-store' && (
+        <div className="bg-gray-50 border-b p-4">
+          <div className="max-w-4xl mx-auto">
+            <label htmlFor="store-select" className="block text-sm font-semibold text-gray-700 mb-2">
+              Filter by Store:
+            </label>
+            <select
+              id="store-select"
+              value={selectedStore}
+              onChange={(e) => setSelectedStore(e.target.value)}
+              className="w-full md:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">All Stores</option>
+              {stores.map(store => (
+                <option key={store} value={store}>{store}</option>
               ))}
             </select>
           </div>
