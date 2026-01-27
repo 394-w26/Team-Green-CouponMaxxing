@@ -4,6 +4,7 @@ import { getDaysUntilExpiration, getExpiringSoonCount, getStoreIcon } from './co
 import CouponList from './CouponList';
 import CouponDetailModal from './CouponDetailModal';
 import AddCouponForm from './AddCouponForm';
+import Login from './Login';
 import { onValue, push, ref, remove, set } from 'firebase/database';
 import { db } from './firebase';
 import { useAuthUser } from './useAuthUser';
@@ -18,7 +19,7 @@ type CouponData = Omit<Coupon, 'id' | 'status'> & {
 };
 
 function App() {
-  const { user, loading } = useAuthUser();
+  const { user, loading, signInWithGoogle, signOut } = useAuthUser();
   const [couponsById, setCouponsById] = useState<Record<string, CouponData>>({});
   const [couponStates, setCouponStates] = useState<Record<string, CouponState>>({});
   const [savedCoupons, setSavedCoupons] = useState<Record<string, boolean> | null>(null);
@@ -280,15 +281,19 @@ function App() {
     }
   };
 
-  if (loading || !user) {
+  // Show loading state
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600 font-semibold">Connecting to your coupon vault...</p>
+        <p className="text-gray-600 font-semibold">Loading...</p>
       </div>
     );
   }
 
-  console.log('UID:', user.uid);
+  // Show login screen if not authenticated
+  if (!user) {
+    return <Login onSignIn={signInWithGoogle} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -296,11 +301,28 @@ function App() {
       <header className="bg-blue-600 text-white p-4 shadow-lg sticky top-0 z-40">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-bold">💰CouponMaxxing</h1>
-          {expiringSoonCount > 0 && (
-            <div className="bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">
-              {expiringSoonCount}
+          <div className="flex items-center gap-4">
+            {expiringSoonCount > 0 && (
+              <div className="bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">
+                {expiringSoonCount}
+              </div>
+            )}
+            <div className="flex items-center gap-3">
+              {user.photoURL && (
+                <img 
+                  src={user.photoURL} 
+                  alt="Profile" 
+                  className="w-8 h-8 rounded-full border-2 border-white"
+                />
+              )}
+              <button
+                onClick={signOut}
+                className="text-sm bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Sign Out
+              </button>
             </div>
-          )}
+          </div>
         </div>
       </header>
 
