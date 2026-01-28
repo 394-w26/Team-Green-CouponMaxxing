@@ -95,17 +95,17 @@ export const getDaysUntilExpiration = (expirationDate: string): number => {
 };
 
 export const getExpirationColor = (daysUntil: number): string => {
-  if (daysUntil < 0) return 'text-red-700';
-  if (daysUntil <= 1) return 'text-red-600';
-  if (daysUntil <= 3) return 'text-orange-600';
-  return 'text-gray-600';
+  if (daysUntil < 0) return 'text-slate-500';
+  if (daysUntil <= 1) return 'text-rose-600';
+  if (daysUntil <= 3) return 'text-amber-600';
+  return 'text-slate-600';
 };
 
 export const getExpirationBgColor = (daysUntil: number): string => {
-  if (daysUntil < 0) return 'bg-gray-200 border-gray-400';
-  if (daysUntil <= 1) return 'bg-red-100 border-red-300';
-  if (daysUntil <= 3) return 'bg-orange-100 border-orange-300';
-  return 'bg-white';
+  if (daysUntil < 0) return 'bg-slate-100 border-slate-300';
+  if (daysUntil <= 1) return 'bg-rose-50 border-rose-200';
+  if (daysUntil <= 3) return 'bg-amber-50 border-amber-200';
+  return 'bg-white/80 border-slate-200';
 };
 
 export const formatExpirationDate = (date: string, daysUntil: number): string => {
