@@ -2,35 +2,35 @@ interface LoginProps {
     onSignIn: () => void;
   }
   
-  export default function Login({ onSignIn }: LoginProps) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">💰 CouponMaxxing</h1>
-            <p className="text-gray-600">Track your coupon savings like never before</p>
+export default function Login({ onSignIn }: LoginProps) {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-800 flex items-center justify-center p-6">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-display text-slate-900 mb-2">💰 CouponMaxxing</h1>
+          <p className="text-slate-600">Track your coupon savings like never before</p>
+        </div>
+
+        <div className="space-y-4 mb-8">
+          <div className="flex items-center gap-3 text-slate-700">
+            <span className="text-2xl">🎯</span>
+            <p>Never miss a deal again</p>
           </div>
-  
-          <div className="space-y-4 mb-8">
-            <div className="flex items-center gap-3 text-gray-700">
-              <span className="text-2xl">🎯</span>
-              <p>Never miss a deal again</p>
-            </div>
-            <div className="flex items-center gap-3 text-gray-700">
-              <span className="text-2xl">⏰</span>
-              <p>Get alerts for expiring coupons</p>
-            </div>
-            <div className="flex items-center gap-3 text-gray-700">
-              <span className="text-2xl">📊</span>
-              <p>Track savings by category & store</p>
-            </div>
+          <div className="flex items-center gap-3 text-slate-700">
+            <span className="text-2xl">⏰</span>
+            <p>Get alerts for expiring coupons</p>
           </div>
-  
-          <button
-            onClick={onSignIn}
-            className="w-full bg-white border-2 border-gray-300 text-gray-700 py-3 px-6 rounded-lg font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-3"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
+          <div className="flex items-center gap-3 text-slate-700">
+            <span className="text-2xl">📊</span>
+            <p>Track savings by category & store</p>
+          </div>
+        </div>
+
+        <button
+          onClick={onSignIn}
+          className="w-full bg-white border-2 border-slate-200 text-slate-700 py-3 px-6 rounded-xl font-semibold hover:bg-slate-50 transition-colors flex items-center justify-center gap-3 shadow-sm"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -49,12 +49,12 @@ interface LoginProps {
               />
             </svg>
             <span>Sign in with Google</span>
-          </button>
-  
-          <p className="text-xs text-gray-500 text-center mt-6">
-            Your coupons are private and synced to your Google account
-          </p>
-        </div>
+        </button>
+
+        <p className="text-xs text-slate-500 text-center mt-6">
+          Your coupons are private and synced to your Google account
+        </p>
       </div>
-    );
-  }
+    </div>
+  );
+}

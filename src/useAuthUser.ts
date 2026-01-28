@@ -3,16 +3,42 @@ import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut as fir
 import type { User } from "firebase/auth";
 import { auth } from "./firebase";
 
+const isGoogleUser = (u: User) => u.providerData.some((p) => p.providerId === "google.com");
+
 export function useAuthUser() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let resolved = false;
+    const timeout = setTimeout(() => {
+      if (resolved) return;
+      const current = auth.currentUser;
+      if (current && !isGoogleUser(current)) {
+        void firebaseSignOut(auth);
+        setUser(null);
+      } else {
+        setUser(current ?? null);
+      }
+      setLoading(false);
+    }, 2500);
+
     const unsub = onAuthStateChanged(auth, (u) => {
+      resolved = true;
+      clearTimeout(timeout);
+      if (u && !isGoogleUser(u)) {
+        void firebaseSignOut(auth);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
       setUser(u);
       setLoading(false);
     });
-    return () => unsub();
+    return () => {
+      clearTimeout(timeout);
+      unsub();
+    };
   }, []);
 
   const signInWithGoogle = async () => {
