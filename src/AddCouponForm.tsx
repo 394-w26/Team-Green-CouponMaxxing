@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createWorker } from 'tesseract.js';
 import type { Coupon } from './types';
 
 interface AddCouponFormProps {
@@ -12,6 +13,157 @@ export default function AddCouponForm({ onClose, onAddCoupon }: AddCouponFormPro
   const [expirationDate, setExpirationDate] = useState('');
   const [category, setCategory] = useState('');
   const [shareGlobally, setShareGlobally] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const parseCouponText = (text: string) => {
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+    
+    // Simple heuristics for parsing
+    let parsedStore = '';
+    let parsedDiscount = '';
+    let parsedExpiration = '';
+    let parsedCategory = '';
+
+    // Common store names to look for
+    const commonStores = ['CVS', 'Walgreens', 'Target', 'Walmart', 'Amazon', 'Best Buy', 'Home Depot', 'Lowes', 'Starbucks', 'McDonald\'s', 'Subway', 'Pizza Hut', 'Domino\'s', 'Chipotle', 'Taco Bell'];
+
+    // First, search for known store names in the entire text
+    const fullText = text.toUpperCase();
+    for (const store of commonStores) {
+      if (fullText.includes(store.toUpperCase())) {
+        parsedStore = store;
+        break;
+      }
+    }
+
+    // If no known store found, look for store name patterns
+    if (!parsedStore) {
+      // Look for lines that might be store names (short, capitalized, no numbers)
+      for (const line of lines) {
+        if (line.length > 2 && line.length < 30 && !/\d/.test(line) && /^[A-Z\s&'-]+$/.test(line)) {
+          // Check if it looks like a store name
+          if (!line.toLowerCase().includes('off') && !line.toLowerCase().includes('save') && !line.toLowerCase().includes('coupon')) {
+            parsedStore = line;
+            break;
+          }
+        }
+      }
+    }
+
+    // Fallback: look for "from"/"at" patterns
+    if (!parsedStore) {
+      for (const line of lines) {
+        if (line.toLowerCase().includes('from') || line.toLowerCase().includes('at')) {
+          const parts = line.split(/\s+/);
+          const index = parts.findIndex(p => p.toLowerCase() === 'from' || p.toLowerCase() === 'at');
+          if (index !== -1 && index + 1 < parts.length) {
+            parsedStore = parts.slice(index + 1).join(' ');
+            break;
+          }
+        }
+      }
+    }
+
+    // Last resort: first line
+    if (!parsedStore && lines.length > 0) {
+      parsedStore = lines[0];
+    }
+
+    // Look for discount patterns
+    const discountPatterns = [
+      /(\$?\d+(?:\.\d{2})?\s*(?:off|% off|save|discount))/i,
+      /(save\s*\$?\d+(?:\.\d{2})?)/i,
+      /(\d+%\s*off)/i,
+      /(buy\s*one\s*get\s*one)/i,
+      /(bogo)/i,
+      /(free\s*shipping)/i
+    ];
+    
+    for (const line of lines) {
+      for (const pattern of discountPatterns) {
+        const match = line.match(pattern);
+        if (match) {
+          parsedDiscount = match[0];
+          break;
+        }
+      }
+      if (parsedDiscount) break;
+    }
+
+    // Look for expiration date
+    const datePatterns = [
+      /(?:expires?|exp|valid through?|until|exp\.)\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+      /(?:expires?|exp|valid through?|until|exp\.)\s*(\d{4}-\d{2}-\d{2})/i,
+      /(?:expires?|exp|valid through?|until|exp\.)\s*(\w+ \d{1,2},? \d{4})/i,
+      /(\d{1,2}\/\d{1,2}\/\d{2,4})\s*(?:exp|expiration)/i,
+      /(\d{4}-\d{2}-\d{2})\s*(?:exp|expiration)/i
+    ];
+    
+    for (const line of lines) {
+      for (const pattern of datePatterns) {
+        const match = line.match(pattern);
+        if (match) {
+          const dateStr = match[1];
+          // Try to parse and format as YYYY-MM-DD
+          const parsedDate = new Date(dateStr);
+          if (!isNaN(parsedDate.getTime())) {
+            parsedExpiration = parsedDate.toISOString().split('T')[0];
+            break;
+          }
+        }
+      }
+      if (parsedExpiration) break;
+    }
+
+    // Infer category from store or discount
+    const storeLower = parsedStore.toLowerCase();
+    if (storeLower.includes('food') || storeLower.includes('pizza') || storeLower.includes('restaurant') || storeLower.includes('mcdonald') || storeLower.includes('subway') || storeLower.includes('chipotle') || storeLower.includes('taco bell') || storeLower.includes('domino')) {
+      parsedCategory = 'Food';
+    } else if (storeLower.includes('pharmacy') || storeLower.includes('cvs') || storeLower.includes('walgreens')) {
+      parsedCategory = 'Pharmacy';
+    } else if (storeLower.includes('target') || storeLower.includes('walmart') || storeLower.includes('best buy') || storeLower.includes('home depot') || storeLower.includes('lowes')) {
+      parsedCategory = 'Retail';
+    } else if (storeLower.includes('movie') || storeLower.includes('entertainment') || storeLower.includes('starbucks')) {
+      parsedCategory = 'Entertainment';
+    }
+
+    return { store: parsedStore, discount: parsedDiscount, expirationDate: parsedExpiration, category: parsedCategory };
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImageFile(file);
+    setIsProcessing(true);
+
+    try {
+      const worker = await createWorker('eng');
+      const { data: { text } } = await worker.recognize(file);
+      await worker.terminate();
+
+      const parsed = parseCouponText(text);
+      
+      console.log('Extracted text:', text);
+      console.log('Parsed data:', parsed);
+      
+      if (parsed.store) setStore(parsed.store);
+      if (parsed.discount) setDiscount(parsed.discount);
+      if (parsed.expirationDate) setExpirationDate(parsed.expirationDate);
+      if (parsed.category) setCategory(parsed.category);
+      
+      // If store wasn't found but text was extracted, show the text for debugging
+      if (!parsed.store && text.trim()) {
+        alert(`OCR extracted text but couldn't identify store. Extracted text:\n\n${text}\n\nPlease fill in the store name manually.`);
+      }
+    } catch (error) {
+      console.error('OCR failed:', error);
+      alert('Failed to process the image. Please fill in the details manually.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +200,21 @@ export default function AddCouponForm({ onClose, onAddCoupon }: AddCouponFormPro
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="image" className="block text-sm font-semibold text-slate-700 mb-1">
+              Upload Coupon Image (Optional)
+            </label>
+            <input
+              type="file"
+              id="image"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              disabled={isProcessing}
+            />
+            {isProcessing && <p className="text-sm text-emerald-600 mt-1">Processing image...</p>}
+          </div>
+
           <div>
             <label htmlFor="store" className="block text-sm font-semibold text-slate-700 mb-1">
               Store Name *
