@@ -39,6 +39,7 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedStore, setSelectedStore] = useState<string>('all');
   const [storeQuery, setStoreQuery] = useState<string>('');
+  const [showGlobalOnDashboard, setShowGlobalOnDashboard] = useState(false);
   const seededSavedCoupons = useRef(false);
   const TRASH_AUTO_DELETE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -223,8 +224,8 @@ function App() {
     });
   }, [user, couponStates, couponsById, userCouponsById]);
 
-  const coupons = useMemo(() => {
-    const globalCoupons = Object.entries(couponsById).map(([id, data]) => {
+  const globalCoupons = useMemo(() => {
+    return Object.entries(couponsById).map(([id, data]) => {
       const state = couponStates[id];
       return {
         id,
@@ -233,7 +234,9 @@ function App() {
         ...data,
       } as Coupon;
     });
+  }, [couponsById, couponStates]);
 
+  const privateCoupons = useMemo(() => {
     const personalCoupons = Object.entries(userCouponsById).map(([id, data]) => {
       const state = couponStates[id];
       return {
@@ -244,16 +247,30 @@ function App() {
       } as Coupon;
     });
 
-    const allCoupons = [...globalCoupons, ...personalCoupons];
-
     if (savedCoupons) {
-      return allCoupons.filter(
+      return personalCoupons.filter(
         (coupon) => savedCoupons[coupon.id] !== false && !couponStates[coupon.id]?.hidden
       );
     }
 
-    return allCoupons.filter((coupon) => !couponStates[coupon.id]?.hidden);
-  }, [couponsById, userCouponsById, couponStates, savedCoupons]);
+    return personalCoupons.filter((coupon) => !couponStates[coupon.id]?.hidden);
+  }, [userCouponsById, couponStates, savedCoupons]);
+
+  const coupons = useMemo(() => {
+    // Dashboard shows only private coupons, unless toggle is enabled
+    if (!showGlobalOnDashboard) {
+      return privateCoupons;
+    }
+    
+    // When toggle is on, include saved global coupons too
+    const globalCouponsFiltered = globalCoupons.filter(
+      (coupon) => savedCoupons && savedCoupons[coupon.id] === true && !couponStates[coupon.id]?.hidden
+    );
+
+    const allCoupons = [...privateCoupons, ...globalCouponsFiltered];
+
+    return allCoupons;
+  }, [globalCoupons, privateCoupons, couponStates, savedCoupons, showGlobalOnDashboard]);
 
   const activeCoupons = useMemo(() => 
     coupons.filter(c => {
@@ -263,6 +280,16 @@ function App() {
       return daysUntil >= 0; // Exclude expired coupons (negative days)
     }), 
     [coupons]
+  );
+
+  const activeGlobalCoupons = useMemo(() => 
+    globalCoupons.filter(c => {
+      // Only show coupons that are active AND not expired
+      if (c.status !== 'active') return false;
+      const daysUntil = getDaysUntilExpiration(c.expirationDate);
+      return daysUntil >= 0; // Exclude expired coupons (negative days)
+    }), 
+    [globalCoupons]
   );
 
   const expiredCoupons = useMemo(() =>
@@ -333,6 +360,14 @@ function App() {
   }, [activeFilter, storeQuery]);
 
   const filteredCoupons = useMemo(() => {
+    if (activeFilter === 'global-coupons') {
+      return [...activeGlobalCoupons].sort((a, b) => {
+        const dateA = new Date(a.expirationDate).getTime();
+        const dateB = new Date(b.expirationDate).getTime();
+        return dateA - dateB;
+      });
+    }
+
     if (activeFilter === 'used') {
       return [...usedCoupons].sort((a, b) => {
         const dateA = new Date(a.expirationDate).getTime();
@@ -622,7 +657,13 @@ function App() {
               onClick={() => setActiveFilter('all')}
               className={tabClass(activeFilter === 'all')}
             >
-              All Coupons
+              Dashboard
+            </button>
+            <button
+              onClick={() => setActiveFilter('global-coupons')}
+              className={tabClass(activeFilter === 'global-coupons')}
+            >
+              🌍 Global Coupons ({dataReady ? activeGlobalCoupons.length : '—'})
             </button>
             <button
               onClick={() => setActiveFilter('expiring-soon')}
@@ -674,6 +715,24 @@ function App() {
             <div className="max-w-5xl mx-auto px-4 py-2 text-xs text-slate-600 font-semibold">
               Syncing your data…
               {syncError && <span className="text-rose-600"> {syncError}</span>}
+            </div>
+          </div>
+        )}
+        {activeFilter === 'all' && (
+          <div className="border-t border-slate-200 bg-slate-50">
+            <div className="max-w-5xl mx-auto px-4 py-2.5 flex justify-end items-center">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <span className="text-sm text-slate-700 font-medium">Include saved global coupons</span>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={showGlobalOnDashboard}
+                    onChange={(e) => setShowGlobalOnDashboard(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </div>
+              </label>
             </div>
           </div>
         )}
